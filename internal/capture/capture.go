@@ -2,6 +2,7 @@
 package capture
 
 import (
+	"errors"
 	"fmt"
 	"image"
 
@@ -9,12 +10,26 @@ import (
 	"github.com/jezek/xgb/xproto"
 )
 
+// Error is a capture error that carries a user-facing hint alongside the
+// underlying error. The hint provides actionable context that helps the
+// user understand what went wrong and how to fix it.
+type Error struct {
+	Err  error
+	Hint string
+}
+
+func (e *Error) Error() string { return e.Err.Error() }
+func (e *Error) Unwrap() error { return e.Err }
+
 // Screen captures the entire screen from the X11 display.
 // If display is empty, the $DISPLAY environment variable is used.
 func Screen(display string) (*image.RGBA, error) {
 	conn, err := xgb.NewConnDisplay(display)
 	if err != nil {
-		return nil, fmt.Errorf("connect to X11 display: %w (is $DISPLAY set?)", err)
+		return nil, &Error{
+			Err:  fmt.Errorf("could not connect to X11 display: %w", err),
+			Hint: "Is $DISPLAY set? This tool requires an X11 display (e.g. gamescope-session).",
+		}
 	}
 	defer conn.Close()
 
@@ -23,7 +38,10 @@ func Screen(display string) (*image.RGBA, error) {
 	height := screen.HeightInPixels
 
 	if width == 0 || height == 0 {
-		return nil, fmt.Errorf("screen has zero dimensions: %dx%d", width, height)
+		return nil, &Error{
+			Err:  fmt.Errorf("X11 screen reported zero dimensions (%dx%d)", width, height),
+			Hint: "The X11 display may not be fully initialized.",
+		}
 	}
 
 	reply, err := xproto.GetImage(
@@ -35,10 +53,21 @@ func Screen(display string) (*image.RGBA, error) {
 		0xFFFFFFFF,
 	).Reply()
 	if err != nil {
-		return nil, fmt.Errorf("get image: %w", err)
+		return nil, &Error{
+			Err:  fmt.Errorf("could not capture screen: %w", err),
+			Hint: getImageHint(err),
+		}
 	}
 
-	return ConvertBGRAToRGBA(reply.Data, int(width), int(height))
+	img, err := ConvertBGRAToRGBA(reply.Data, int(width), int(height))
+	if err != nil {
+		return nil, &Error{
+			Err:  fmt.Errorf("unexpected pixel format from X11 server: %w", err),
+			Hint: "The display is using an unsupported color depth.",
+		}
+	}
+
+	return img, nil
 }
 
 // ConvertBGRAToRGBA converts raw BGRA pixel data (as returned by X11 ZPixmap
@@ -59,4 +88,22 @@ func ConvertBGRAToRGBA(data []byte, width, height int) (*image.RGBA, error) {
 	}
 
 	return img, nil
+}
+
+func getImageHint(err error) string {
+	var matchErr xproto.MatchError
+	if errors.As(err, &matchErr) {
+		return "The X11 server refused to capture the root window. This typically\n" +
+			"happens on Wayland desktops where Xwayland does not expose the\n" +
+			"composited screen through X11. screenscope is designed for use\n" +
+			"inside gamescope-session."
+	}
+
+	var drawableErr xproto.DrawableError
+	if errors.As(err, &drawableErr) {
+		return "The X11 root window is not a valid drawable. The display server\n" +
+			"may not support direct screen capture."
+	}
+
+	return "An unexpected X11 error occurred while capturing the screen."
 }

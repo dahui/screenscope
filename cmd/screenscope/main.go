@@ -3,6 +3,7 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -62,13 +63,11 @@ func main() {
 
 	img, err := capture.Screen("")
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "error: %v\n", err)
-		os.Exit(1)
+		exitWithError(err)
 	}
 
 	if err := encode.WritePNG(img, path); err != nil {
-		fmt.Fprintf(os.Stderr, "error: %v\n", err)
-		os.Exit(1)
+		exitWithError(err)
 	}
 
 	fmt.Println(path)
@@ -88,6 +87,17 @@ The --file and --dir flags are mutually exclusive.
 Flags:
 `)
 	flag.PrintDefaults()
+}
+
+func exitWithError(err error) {
+	fmt.Fprintf(os.Stderr, "error: %v\n", err)
+
+	var capErr *capture.Error
+	if errors.As(err, &capErr) && capErr.Hint != "" {
+		fmt.Fprintf(os.Stderr, "\n%s\n", capErr.Hint)
+	}
+
+	os.Exit(1)
 }
 
 // resolveOutput determines the output file path from the provided flags.
