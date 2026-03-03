@@ -1,0 +1,54 @@
+version: 2
+
+project_name: screenscope
+
+before:
+  hooks:
+    - go mod tidy
+
+builds:
+  - id: screenscope
+    binary: screenscope
+    main: ./cmd/screenscope
+    ldflags:
+      - -s -w -X main.Version={{.Version}}
+    goos:
+      - linux
+    goarch:
+      - amd64
+
+archives:
+  - id: screenscope
+    formats: [tar.gz]
+    name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    files:
+      - LICENSE
+
+checksum:
+  name_template: "checksums.txt"
+
+nfpms:
+  - id: screenscope-pkg
+    package_name: screenscope
+    section: utils
+    formats:
+      - archlinux
+      - deb
+      - rpm
+    homepage: https://github.com/dahui/screenscope
+    maintainer: "Jeff Hagadorn <noreply@github.com>"
+    description: X11 screenshot tool for gamescope-session
+    license: Apache-2.0
+    provides:
+      - screenscope
+    contents:
+      - src: LICENSE
+        dst: /usr/share/licenses/screenscope/LICENSE
+    archlinux:
+      packager: "Jeff Hagadorn <noreply@github.com>"
+    rpm:
+      group: Applications/System
+
+release:
+  draft: false
+  prerelease: auto
