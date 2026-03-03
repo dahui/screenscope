@@ -47,7 +47,7 @@ sudo make install
 screenscope
 
 # Save to a specific file
-screenscope -o screenshot.png
+screenscope -f screenshot.png
 
 # Save to a directory with an auto-generated filename
 screenscope -d ~/Pictures
@@ -56,7 +56,7 @@ screenscope -d ~/Pictures
 screenscope --delay 5
 
 # Combine flags
-screenscope --delay 3 -o ~/Pictures/steam.png
+screenscope -D 3 -f ~/Pictures/steam.png
 ```
 
 The output file path is printed to stdout on success. If no output flag is
@@ -67,13 +67,13 @@ given, the file is saved to the current directory as
 
 | Flag | Description |
 |------|-------------|
-| `-o`, `--output` | Write screenshot to this file path |
+| `-f`, `--file` | Write screenshot to this file path |
 | `-d`, `--dir` | Write screenshot to this directory with an auto-generated filename |
-| `--delay` | Wait this many seconds before capturing |
+| `-D`, `--delay` | Wait this many seconds before capturing |
 | `-h`, `--help` | Show help |
 | `--version` | Print version and exit |
 
-`--output` and `--dir` are mutually exclusive.
+`--file` and `--dir` are mutually exclusive.
 
 ## License
 
