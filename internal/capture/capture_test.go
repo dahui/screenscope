@@ -1,6 +1,8 @@
 package capture_test
 
 import (
+	"errors"
+	"fmt"
 	"testing"
 
 	"github.com/dahui/screenscope/internal/capture"
@@ -117,6 +119,31 @@ func TestConvertBGRAToRGBA_TooMuchData(t *testing.T) {
 	_, err := capture.ConvertBGRAToRGBA([]byte{0x00, 0x00, 0x00, 0x00, 0xFF}, 1, 1)
 	if err == nil {
 		t.Error("expected error for excess data")
+	}
+}
+
+func TestError_Error(t *testing.T) {
+	inner := fmt.Errorf("something broke")
+	e := &capture.Error{Err: inner, Hint: "try fixing it"}
+	if e.Error() != "something broke" {
+		t.Errorf("Error() = %q, want %q", e.Error(), "something broke")
+	}
+}
+
+func TestError_Unwrap(t *testing.T) {
+	inner := fmt.Errorf("root cause")
+	e := &capture.Error{Err: inner, Hint: "helpful hint"}
+
+	if !errors.Is(e, inner) {
+		t.Error("errors.Is should match the inner error")
+	}
+
+	var target *capture.Error
+	if !errors.As(e, &target) {
+		t.Error("errors.As should match *capture.Error")
+	}
+	if target.Hint != "helpful hint" {
+		t.Errorf("Hint = %q, want %q", target.Hint, "helpful hint")
 	}
 }
 

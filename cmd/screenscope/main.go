@@ -1,5 +1,5 @@
-// Screenscope captures screenshots from X11 displays, including inside
-// gamescope-session where standard screenshot tools fail.
+// Screenscope captures screenshots via PipeWire (gamescope-session) or X11
+// (traditional desktops).
 package main
 
 import (
@@ -76,7 +76,7 @@ func main() {
 func usage() {
 	fmt.Fprintf(os.Stderr, `Usage: screenscope [flags]
 
-Capture a screenshot from the current X11 display. Designed for use inside
+Capture a screenshot via PipeWire or X11. Designed for use inside
 gamescope-session where standard screenshot tools fail.
 
 If neither --file nor --dir is specified, the screenshot is saved to the

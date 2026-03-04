@@ -6,7 +6,7 @@ PREFIX  ?= /usr/local
 
 ## build: compile screenscope
 build:
-	go build -ldflags "$(LDFLAGS)" -o screenscope ./cmd/screenscope
+	CGO_ENABLED=1 go build -ldflags "$(LDFLAGS)" -o screenscope ./cmd/screenscope
 
 ## test: run unit tests
 test:

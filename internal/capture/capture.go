@@ -1,10 +1,11 @@
-// Package capture provides X11 screen capture using the xgb library.
+// Package capture provides screen capture via PipeWire (gamescope-session)
+// with an X11 fallback for traditional desktops.
 package capture
 
 import (
-	"errors"
 	"fmt"
 	"image"
+	"os"
 
 	"github.com/jezek/xgb"
 	"github.com/jezek/xgb/xproto"
@@ -21,15 +22,53 @@ type Error struct {
 func (e *Error) Error() string { return e.Err.Error() }
 func (e *Error) Unwrap() error { return e.Err }
 
-// Screen captures the entire screen from the X11 display.
-// If display is empty, the $DISPLAY environment variable is used.
+// Screen captures the entire screen. It tries PipeWire first (which works
+// inside gamescope-session), then falls back to X11 GetImage (which works on
+// traditional X11 desktops).
+//
+// If display is empty, the $DISPLAY environment variable is used for the X11
+// fallback. If $DISPLAY is also empty, the function scans /tmp/.X11-unix/ for
+// available X11 servers and connects to the first one that responds.
 func Screen(display string) (*image.RGBA, error) {
+	// Try PipeWire first (works in gamescope-session).
+	img, pwErr := ViaPipeWire()
+	if pwErr == nil {
+		return img, nil
+	}
+
+	// Fall back to X11 GetImage (works on traditional X11 desktops).
+	img, x11Err := captureX11(display)
+	if x11Err == nil {
+		return img, nil
+	}
+
+	// Both methods failed. Return a combined error.
+	return nil, &Error{
+		Err: fmt.Errorf("screen capture failed: pipewire: %v; x11: %v", pwErr, x11Err),
+		Hint: fmt.Sprintf("PipeWire capture failed: %v\n", pwErr) +
+			fmt.Sprintf("X11 capture also failed: %v\n\n", x11Err) +
+			"If running inside gamescope-session, ensure PipeWire is running and\n" +
+			"gamescope is exposing a Video/Source node.\n\n" +
+			"If running on a traditional X11 desktop, ensure $DISPLAY is set.",
+	}
+}
+
+// captureX11 captures the screen via X11 GetImage on the root window.
+func captureX11(display string) (*image.RGBA, error) {
+	if display == "" {
+		display = os.Getenv("DISPLAY")
+	}
+	if display == "" {
+		detected, err := detectDisplay()
+		if err != nil {
+			return nil, fmt.Errorf("could not find an X11 display: %w", err)
+		}
+		display = detected
+	}
+
 	conn, err := xgb.NewConnDisplay(display)
 	if err != nil {
-		return nil, &Error{
-			Err:  fmt.Errorf("could not connect to X11 display: %w", err),
-			Hint: "Is $DISPLAY set? This tool requires an X11 display (e.g. gamescope-session).",
-		}
+		return nil, fmt.Errorf("could not connect to X11 display %s: %w", display, err)
 	}
 	defer conn.Close()
 
@@ -38,10 +77,7 @@ func Screen(display string) (*image.RGBA, error) {
 	height := screen.HeightInPixels
 
 	if width == 0 || height == 0 {
-		return nil, &Error{
-			Err:  fmt.Errorf("X11 screen reported zero dimensions (%dx%d)", width, height),
-			Hint: "The X11 display may not be fully initialized.",
-		}
+		return nil, fmt.Errorf("X11 screen reported zero dimensions (%dx%d)", width, height)
 	}
 
 	reply, err := xproto.GetImage(
@@ -53,18 +89,12 @@ func Screen(display string) (*image.RGBA, error) {
 		0xFFFFFFFF,
 	).Reply()
 	if err != nil {
-		return nil, &Error{
-			Err:  fmt.Errorf("could not capture screen: %w", err),
-			Hint: getImageHint(err),
-		}
+		return nil, fmt.Errorf("could not capture screen: %w", err)
 	}
 
 	img, err := ConvertBGRAToRGBA(reply.Data, int(width), int(height))
 	if err != nil {
-		return nil, &Error{
-			Err:  fmt.Errorf("unexpected pixel format from X11 server: %w", err),
-			Hint: "The display is using an unsupported color depth.",
-		}
+		return nil, fmt.Errorf("unexpected pixel format from X11 server: %w", err)
 	}
 
 	return img, nil
@@ -90,20 +120,3 @@ func ConvertBGRAToRGBA(data []byte, width, height int) (*image.RGBA, error) {
 	return img, nil
 }
 
-func getImageHint(err error) string {
-	var matchErr xproto.MatchError
-	if errors.As(err, &matchErr) {
-		return "The X11 server refused to capture the root window. This typically\n" +
-			"happens on Wayland desktops where Xwayland does not expose the\n" +
-			"composited screen through X11. screenscope is designed for use\n" +
-			"inside gamescope-session."
-	}
-
-	var drawableErr xproto.DrawableError
-	if errors.As(err, &drawableErr) {
-		return "The X11 root window is not a valid drawable. The display server\n" +
-			"may not support direct screen capture."
-	}
-
-	return "An unexpected X11 error occurred while capturing the screen."
-}

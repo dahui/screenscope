@@ -1,15 +1,15 @@
 # screenscope
 
-X11 screenshot tool for gamescope-session on Linux.
+Screenshot tool for gamescope-session on Linux.
 
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
 
 Standard screenshot tools don't work inside gamescope-session because gamescope
-runs its own nested compositor. `screenscope` connects directly to gamescope's
-X11 display and captures the root window, producing a PNG of whatever is
-currently on screen (Steam UI, a running game, overlays, etc.).
+runs its own nested compositor. `screenscope` captures frames via PipeWire from
+gamescope's video source node, producing a PNG of whatever is currently on
+screen (Steam UI, a running game, overlays, etc.).
 
-It also works on any regular X11 desktop session.
+On traditional X11 desktops, it falls back to X11 root window capture.
 
 ## Install
 
@@ -32,6 +32,21 @@ go install github.com/dahui/screenscope/cmd/screenscope@latest
 ```
 
 ### Build from source
+
+Requires `libpipewire-0.3` and `libdrm` development headers:
+
+```sh
+# Arch Linux
+sudo pacman -S pipewire libdrm
+
+# Debian / Ubuntu
+sudo apt install libpipewire-0.3-dev libdrm-dev
+
+# Fedora / RHEL
+sudo dnf install pipewire-devel libdrm-devel
+```
+
+Then build:
 
 ```sh
 git clone https://github.com/dahui/screenscope.git

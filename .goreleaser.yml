@@ -10,6 +10,8 @@ builds:
   - id: screenscope
     binary: screenscope
     main: ./cmd/screenscope
+    env:
+      - CGO_ENABLED=1
     ldflags:
       - -s -w -X main.Version={{.Version}}
     goos:
@@ -37,7 +39,10 @@ nfpms:
       - rpm
     homepage: https://github.com/dahui/screenscope
     maintainer: "Jeff Hagadorn <noreply@github.com>"
-    description: X11 screenshot tool for gamescope-session
+    description: Screenshot tool for gamescope-session (PipeWire + X11 fallback)
+    dependencies:
+      - pipewire
+      - libdrm
     license: Apache-2.0
     provides:
       - screenscope
